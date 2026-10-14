@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a7a5a"><link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon.svg">
+<title>مخزون ومبيعات الإكسسوارات</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js"></script>
+<script src="config.js"></script>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--tx:#1b1f24;--mu:#6b7280;--pr:#0a7a5a;--bd:#e3e6ea;--red:#c0392b;color-scheme:light}
+@media(prefers-color-scheme:dark){:root{--bg:#14171a;--card:#1f2428;--tx:#eceff1;--mu:#9aa4ad;--pr:#2bb88a;--bd:#2f363c;--red:#ff6b5b;color-scheme:dark}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font-family:system-ui,Tahoma,sans-serif;padding:env(safe-area-inset-top,0) 0 76px}
+nav{position:fixed;bottom:0;left:0;right:0;display:none;background:var(--card);border-top:1px solid var(--bd);padding-bottom:env(safe-area-inset-bottom,0)}
+nav button{flex:1;border:0;background:none;color:var(--mu);padding:12px 2px;font-size:13px}nav button.on{color:var(--pr);font-weight:700}
+main{padding:12px;max-width:640px;margin:auto}.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px;margin-bottom:10px}
+input,select{width:100%;padding:10px;margin:4px 0;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);font-size:15px}
+.btn{background:var(--pr);color:#fff;border:0;border-radius:8px;padding:10px 14px;font-size:15px;margin:3px 0}.btn.g{background:var(--bd);color:var(--tx)}
+.row{display:flex;gap:8px;align-items:center}.row>*{flex:1}.kpi{display:grid;grid-template-columns:1fr 1fr;gap:8px}.kpi b{display:block;font-size:20px;color:var(--pr)}
+.mu{color:var(--mu);font-size:13px}.low{color:var(--red);font-weight:700}video{width:100%;border-radius:10px;background:#000}.sc{overflow-x:auto}svg{max-width:100%}h3{margin:6px 0}
+</style></head><body><main id="m"><div class="mu">جاري التحميل…</div></main>
+<nav><button data-t="home">الرئيسية</button><button data-t="sell">بيع</button><button data-t="prod">المنتجات</button><button data-t="stock">المخزون</button></nav>
+<script>
+const sb=supabase.createClient(window.SB_URL,window.SB_KEY);
+let me=null,prods=[],costs={},cart=[],ch='محل',stream=null,scanning=false,busy=false;
+const $=s=>document.querySelector(s),n=x=>Math.round(x*100)/100,M=()=>$('#m'),O=()=>me&&me.role==='owner',find=c=>prods.find(p=>p.code===String(c).trim());
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>show(b.dataset.t));
+async function init(){const{data:{session}}=await sb.auth.getSession();session?boot():login()}
+async function boot(){const{data:{user}}=await sb.auth.getUser();const{data}=await sb.from('profiles').select('*').eq('id',user.id).maybeSingle();
+ if(!data){await sb.auth.signOut();return login('الحساب غير مجهز، كلم الأونر')}me=data;show('home')}
+function login(err){stop();$('nav').style.display='none';M().innerHTML=`<div class="card"><h3>تسجيل الدخول</h3>${err?`<div class="low">${esc(err)}</div>`:''}
+ <input id="em" type="email" placeholder="البريد الإلكتروني" autocomplete="username"><input id="pw" type="password" placeholder="الباسورد" autocomplete="current-password"><button class="btn" onclick="go()">دخول</button></div>`}
+async function go(){const{error}=await sb.auth.signInWithPassword({email:$('#em').value.trim(),password:$('#pw').value});if(error)return login('البريد أو الباسورد غلط');boot()}
+async function logout(){await sb.auth.signOut();me=null;cart=[];login()}
+async function loadP(){const a=await sb.from('products').select('*').order('id');prods=a.data||[];costs={};
+ if(O()){const c=await sb.from('product_costs').select('*');(c.data||[]).forEach(x=>costs[x.product_id]=+x.cost)}}
+async function show(t){stop();$('nav').style.display='flex';document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
+ await loadP();({home,sell,prod,stock})[t]()}
+async function home(){const d=new Date();d.setHours(0,0,0,0);
+ const r=await sb.from('sales').select(O()?'total,created_by,sale_costs(cost)':'total,created_by').gte('created_at',d.toISOString()),s=r.data||[];
+ const cost=x=>{const c=x.sale_costs;return Array.isArray(c)?(c[0]?.cost||0):(c?.cost||0)};
+ const tot=s.reduce((a,x)=>a+ +x.total,0),pf=s.reduce((a,x)=>a+ +x.total-cost(x),0),low=prods.filter(p=>p.qty<=p.min_qty);
+ let by='';if(O()){const pr=(await sb.from('profiles').select('id,name')).data||[],g={};s.forEach(x=>g[x.created_by]=(g[x.created_by]||0)+ +x.total);
+  by=`<div class="card"><b>مبيعات اليوم لكل موظف</b>${pr.map(p=>`<div class="mu">${esc(p.name)}: ${n(g[p.id]||0)} ج.م</div>`).join('')}</div>`}
+ M().innerHTML=`<div class="mu">أهلاً ${esc(me.name)} (${O()?'أونر':'موظف'})</div><div class="kpi"><div class="card">مبيعات اليوم<b>${n(tot)} ج.م</b></div>
+ ${O()?`<div class="card">ربح اليوم<b>${n(pf)} ج.م</b></div><div class="card">قيمة المخزون (تكلفة)<b>${n(prods.reduce((a,p)=>a+p.qty*(costs[p.id]||0),0))}</b></div>`:''}
+ <div class="card">قطع في المخزن<b>${prods.reduce((a,p)=>a+p.qty,0)}</b></div></div>${by}
+ <div class="card"><b>أصناف ناقصة (${low.length})</b>${low.map(p=>`<div class="low">${esc(p.name)} — ${p.qty}</div>`).join('')||'<div class="mu">لا يوجد</div>'}</div>
+ ${O()?'<div class="card mu">لإضافة موظف: Supabase ← Authentication ← Users ← Add user (ويفضل إيقاف التسجيل العام).</div>':''}
+ <button class="btn g" onclick="logout()">خروج</button>`}
+function sell(){const tot=cart.reduce((a,c)=>a+c.price*c.q,0);
+ M().innerHTML=`<div class="card"><select id="ch" onchange="ch=this.value">${['محل','فيسبوك','واتساب','متجر إلكتروني'].map(c=>`<option ${c==ch?'selected':''}>${c}</option>`).join('')}</select>
+ <video id="v" hidden playsinline></video><div class="row"><input id="code" placeholder="الباركود"><button class="btn" onclick="addC($('#code').value)">إضافة</button></div>
+ <button class="btn g" onclick="scanTo(null)">فتح الكاميرا للمسح</button></div>
+ <div class="card"><b>السلة</b>${cart.map((c,i)=>`<div class="row"><span>${esc(c.name)}</span><span>${c.price} × <button class="btn g" onclick="q(${i},-1)">−</button> ${c.q} <button class="btn g" onclick="q(${i},1)">+</button></span></div>`).join('')||'<div class="mu">فاضية</div>'}
+ <h3>الإجمالي: ${n(tot)} ج.م</h3>${O()?'<input id="disc" type="number" placeholder="خصم (اختياري)">':''}<button class="btn" onclick="done()">إتمام البيع</button></div>`}
+function addC(c){const p=find(c);if(!p)return alert('المنتج غير موجود');const x=cart.find(i=>i.code===p.code);if((x?x.q:0)+1>p.qty)return alert('الكمية المتاحة لا تكفي');x?x.q++:cart.push({...p,q:1});sell()}
+function q(i,d){const c=cart[i],p=find(c.code);c.q=Math.min(c.q+d,p.qty);if(c.q<=0)cart.splice(i,1);sell()}
+async function done(){if(!cart.length||busy)return;busy=true;const r=await sb.rpc('make_sale',{p_channel:ch,p_discount:O()?+($('#disc').value||0):0,p_items:cart.map(c=>({code:c.code,qty:c.q}))});busy=false;
+ if(r.error)return alert(r.error.message);cart=[];alert('تم البيع ✅');show('sell')}
+function prod(){M().innerHTML=`<div class="card"><h3>إضافة منتج</h3><input id="a1" placeholder="اسم المنتج"><input id="a2" placeholder="الموديل المتوافق (اختياري)">
+ <div class="row">${O()?'<input id="a3" type="number" placeholder="تكلفة الشراء">':''}<input id="a4" type="number" placeholder="سعر البيع"></div>
+ <div class="row"><input id="a5" type="number" placeholder="الكمية"><input id="a6" type="number" placeholder="حد أدنى" value="3"></div>
+ <input id="a7" placeholder="رقم الباركود (مثال 15) أو اتركه فارغاً للترقيم التلقائي"><button class="btn" onclick="addP()">حفظ</button> <button class="btn g" onclick="scanTo('a7')">مسح</button><video id="v" hidden playsinline></video></div>
+ ${prods.map((p,i)=>`<div class="card sc"><b>${esc(p.name)}</b> <span class="mu">${esc(p.model)}</span><div class="mu">${O()?`تكلفة ${costs[p.id]??0} • `:''}بيع ${p.price}${O()?` • ربح ${n(p.price-(costs[p.id]||0))}`:''}</div>
+ <div>الكمية: <span class="${p.qty<=p.min_qty?'low':''}">${p.qty}</span></div><svg id="b${i}"></svg>
+ <div><button class="btn" onclick="img(${i})">حفظ صورة للطباعة</button> ${O()?`<button class="btn g" onclick="del(${p.id})">حذف</button>`:''}</div></div>`).join('')||'<div class="mu">لسه مفيش منتجات</div>'}`;
+ prods.forEach((p,i)=>{try{JsBarcode('#b'+i,p.code,{format:'CODE128',height:45,fontSize:13,margin:4,background:'#fff'})}catch(e){}})}
+async function addP(){const g=i=>($('#a'+i)||{value:''}).value.trim();if(!g(1))return alert('اكتب اسم المنتج');
+ const r=await sb.rpc('add_product',{p_code:g(7),p_name:g(1),p_model:g(2),p_price:+g(4)||0,p_qty:+g(5)||0,p_min:+g(6)||0,p_cost:+g(3)||0});
+ if(r.error)return alert(r.error.message.includes('duplicate')?'الباركود ده موجود بالفعل':r.error.message);show('prod')}
+async function del(id){if(!confirm('حذف المنتج؟'))return;const r=await sb.rpc('delete_product',{p_id:id});if(r.error)return alert(r.error.message);show('prod')}
+function img(i){const p=prods[i],c=document.createElement('canvas');JsBarcode(c,p.code,{format:'CODE128',height:70,fontSize:18,margin:10,background:'#fff'});
+ const w=Math.max(c.width,320),o=document.createElement('canvas');o.width=w;o.height=c.height+90;const x=o.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,w,o.height);x.fillStyle='#000';x.textAlign='center';
+ x.font='bold 20px Tahoma,sans-serif';x.fillText(p.name,w/2,28);x.drawImage(c,(w-c.width)/2,38);x.font='bold 26px Tahoma,sans-serif';x.fillText(p.price+' ج.م',w/2,c.height+75);
+ o.toBlob(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='label-'+p.code+'.png';a.click()})}
+async function stock(){const mv=(await sb.from('stock_moves').select('qty,type,created_at,products(name)').order('id',{ascending:false}).limit(20)).data||[];
+ M().innerHTML=`${O()?`<div class="card"><h3>استلام بضاعة / تسوية</h3><div class="row"><input id="sc" placeholder="الباركود"><button class="btn g" onclick="scanTo('sc')">مسح</button></div><video id="v" hidden playsinline></video>
+ <input id="sq" type="number" placeholder="الكمية (سالب للخصم)"><input id="sn" type="number" placeholder="تكلفة جديدة (اختياري)"><button class="btn" onclick="recv()">تسجيل</button></div>
+ <div class="card"><h3>مرتجع</h3><div class="row"><input id="rc" placeholder="الباركود"><button class="btn g" onclick="scanTo('rc')">مسح</button></div><input id="rq" type="number" placeholder="الكمية المرتجعة"><button class="btn" onclick="ret()">تسجيل المرتجع</button></div>`
+ :'<div class="card mu">الاستلام والمرتجع والتسويات من صلاحيات الأونر.</div>'}
+ <div class="card"><b>حركة المخزون</b>${mv.map(m=>`<div class="mu">${new Date(m.created_at).toLocaleDateString('ar-EG')} • ${esc(m.products?.name)} • ${m.qty>0?'+':''}${m.qty} • ${esc(m.type)}</div>`).join('')||'<div class="mu">لا يوجد</div>'}</div>`}
+async function recv(){const qq=+$('#sq').value;if(!$('#sc').value||!qq&&!+$('#sn').value)return alert('راجع الباركود والكمية');
+ const r=await sb.rpc('receive_stock',{p_code:$('#sc').value.trim(),p_qty:qq,p_cost:+$('#sn').value||null});if(r.error)return alert(r.error.message);show('stock')}
+async function ret(){const r=await sb.rpc('return_product',{p_code:$('#rc').value.trim(),p_qty:+$('#rq').value});if(r.error)return alert(r.error.message);alert('تم المرتجع ✅');show('stock')}
+async function scanTo(id){const v=$('#v');if(!('BarcodeDetector' in window))return alert('المتصفح لا يدعم مسح الباركود بالكاميرا. افتح الصفحة في Chrome أو اكتب الكود يدويًا.');
+ try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}})}catch(e){return alert('لازم تسمح بالكاميرا')}
+ v.srcObject=stream;v.hidden=false;await v.play();scanning=true;const d=new BarcodeDetector();
+ (async function loop(){if(!scanning)return;try{const r=await d.detect(v);if(r.length){const c=r[0].rawValue;stop();if(id){$('#'+id).value=c}else addC(c);return}}catch(e){}setTimeout(loop,300)})()}
+function stop(){scanning=false;if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}}
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+init();
+</script></body></html>

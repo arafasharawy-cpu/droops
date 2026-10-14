@@ -1,0 +1,2 @@
+﻿window.SB_URL='https://eebodlcmztugaujsbwlv.supabase.co';
+window.SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVlYm9kbGNtenR1Z2F1anNid2x2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5MzY2MzQsImV4cCI6MjEwNzUxMjYzNH0.j8hHeNMhzVLjyR0RvwdfEM1TkBy3QTozpOgre5BpVBs';
