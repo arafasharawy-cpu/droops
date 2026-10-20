@@ -34,25 +34,10 @@ input,select{width:100%;padding:10px;margin:4px 0;border:1px solid var(--bd);bor
 </style></head><body><main id="m"><div class="mu">جاري التحميل…</div></main>
 <nav><button data-t="home">الرئيسية</button><button data-t="sell">بيع</button><button data-t="prod">المنتجات</button><button data-t="stock">المخزون</button><button data-t="tx">المعاملات</button><button data-t="count" data-o="1">الجرد</button></nav>
 <div id="pr"></div>
-<script>
-const sb=supabase.createClient(window.SB_URL,window.SB_KEY);
-const PAYS={cash:'كاش',card:'فيزا',instapay:'انستاباي',wallet:'محفظة'};
-let me=null,prods=[],costs={},cart=[],ch='محل',stream=null,scanning=false,busy=false,pay='cash',dv='',INV=null,stk=null,cnt={},sp=Promise.resolve(),tf={d1:'',d2:'',pm:''};
-const $=s=>document.querySelector(s),n=x=>Math.round(x*100)/100,M=()=>$('#m'),O=()=>me&&me.role==='owner',find=c=>prods.find(p=>p.code===String(c).trim());
-const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const lsGet=k=>{try{return localStorage.getItem('inv_'+k)}catch(e){return null}},lsSet=(k,v)=>{try{localStorage.setItem('inv_'+k,v)}catch(e){}};
-const td=()=>new Date(Date.now()-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,10);
-document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>show(b.dataset.t));
-async function init(){const{data:{session}}=await sb.auth.getSession();session?boot():login()}
-async function boot(){const{data:{user}}=await sb.auth.getUser();const{data}=await sb.from('profiles').select('*').eq('id',user.id).maybeSingle();
- if(!data){await sb.auth.signOut();return login('الحساب غير مجهز، كلم الأونر')}me=data;
- document.querySelectorAll('nav [data-o]').forEach(b=>b.style.display=O()?'':'none');show('home')}
-function login(err){stop();$('nav').style.display='none';M().innerHTML=`<div class="card"><h3>تسجيل الدخول</h3>${err?`<div class="low">${esc(err)}</div>`:''}
- <input id="em" type="email" placeholder="البريد الإلكتروني" autocomplete="username"><input id="pw" type="password" placeholder="الباسورد" autocomplete="current-password"><button class="btn" onclick="go()">دخول</button></div>`}
-async function go(){const{error}=await sb.auth.signInWithPassword({email:$('#em').value.trim(),password:$('#pw').value});if(error)return login('البريد أو الباسورد غلط');boot()}
-async function logout(){await sb.auth.signOut();me=null;cart=[];login()}
-async function loadP(){const a=await sb.from('products').select('*').order('id');prods=a.data||[];costs={};
- if(O()){const c=await sb.from('product_costs').select('*');(c.data||[]).forEach(x=>costs[x.product_id]=+x.cost)}}
-async function show(t){stop();$('nav').style.display='flex';document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
- await loadP();({home,sell,prod,stock,tx,count})[t]()}
-async function home(){const d=new Da
+<script src="a1.js"></script>
+<script src="a2.js"></script>
+<script src="a3.js"></script>
+<script src="a4.js"></script>
+<script src="a5.js"></script>
+<script src="a6.js"></script>
+</body></html>
